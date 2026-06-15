@@ -64,6 +64,14 @@ export class PassRunner {
       },
     } as PassContext; // Type cast to allow dynamic properties for cross-pass data sharing
 
+    // Expose the live accumulator arrays so downstream passes can consume real
+    // upstream output (e.g. GatewaySemanticAnalyzer reads ExpressionClassifier's
+    // descriptors; AggregationEngine reads every prior pass's determinism entries).
+    // The arrays are mutated in place below, so the references stay current.
+    (passContext as { expressionDescriptors?: ExpressionDescriptor[] }).expressionDescriptors =
+      expressionDescriptors;
+    (passContext as { determinismEntries?: DeterminismEntry[] }).determinismEntries = determinism;
+
     for (const pass of this.passes) {
       try {
         const output = await pass.run(passContext);

@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Victor França
 
-import type { AxisYClass, Finding, FlowNodeIr, GatewayDescriptor, IrNode } from "../types.js";
+import type {
+  AxisYClass,
+  ExpressionDescriptor,
+  Finding,
+  FlowNodeIr,
+  GatewayDescriptor,
+  IrNode,
+} from "../types.js";
 import { finalizeFinding } from "../parser/findingHelpers.js";
 import type { PassContext, PassOutput, SemanticPass } from "./SemanticPass.js";
 
@@ -126,6 +133,11 @@ export class GatewaySemanticAnalyzer implements SemanticPass {
       conditionDeterminism?: AxisYClass;
     }> = [];
 
+    // Determinism comes from the ExpressionDescriptor records that
+    // ExpressionClassifier produced upstream (keyed by sequence-flow node id),
+    // exposed on the context by PassRunner — not from a local regex heuristic.
+    const determinismByNode = this.indexExpressionDeterminism(context);
+
     // Find all sequence flow nodes
     for (const [flowId, node] of context.ir.nodes.entries()) {
       if (node.kind !== "flowNode" || node.flowType !== "sequenceFlow") {
@@ -144,9 +156,7 @@ export class GatewaySemanticAnalyzer implements SemanticPass {
       // This flow originates from our gateway
       const hasCondition = !!flowAnnotations?.conditionExpression;
 
-      const conditionDeterminism = hasCondition
-        ? this.inferDeterminism(flowAnnotations.conditionExpression as string)
-        : undefined;
+      const conditionDeterminism = hasCondition ? determinismByNode.get(flowId) : undefined;
 
       flows.push({
         flowId,
@@ -159,22 +169,19 @@ export class GatewaySemanticAnalyzer implements SemanticPass {
   }
 
   /**
-   * Infer determinism from condition expression (simplified heuristic)
-   * TODO: Read from ExpressionDescriptor populated by ExpressionClassifier
+   * Build a flow-id → Axis Y map from ExpressionClassifier's descriptors.
    */
-  private inferDeterminism(expression: string): AxisYClass {
-    // Time-dependent patterns
-    if (/now\(|today\(|Date\.|currentTime/.test(expression)) {
-      return "policyDependent";
+  private indexExpressionDeterminism(context: PassContext): Map<string, AxisYClass> {
+    const descriptors =
+      (context as { expressionDescriptors?: readonly ExpressionDescriptor[] })
+        .expressionDescriptors ?? [];
+    const byNode = new Map<string, AxisYClass>();
+    for (const descriptor of descriptors) {
+      if (descriptor.determinism) {
+        byNode.set(descriptor.nodeId, descriptor.determinism);
+      }
     }
-
-    // External call patterns
-    if (/\$\{[\w]+\.[\w]+\(|HttpClient|fetch\(/.test(expression)) {
-      return "runtimeBound";
-    }
-
-    // Default: pure
-    return "deterministic";
+    return byNode;
   }
 
   /**

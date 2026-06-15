@@ -25,12 +25,11 @@ export class AggregationEngine implements SemanticPass {
   run(context: PassContext): PassOutput {
     const findings: Finding[] = [];
 
-    // Collect determinism entries from context (would come from prior passes in real implementation)
-    // For MVP, we'll receive them via PassRunner accumulation
+    // Collect the determinism entries accumulated by every prior pass. PassRunner
+    // exposes the live accumulator on the context; aggregation runs in the
+    // "summary" phase, so all upstream entries are present by now.
     const determinismEntries =
-      context.findings.filter((f) => f.category === "semantic").length > 0
-        ? [] // Placeholder - real implementation would access accumulated determinism entries
-        : [];
+      (context as { determinismEntries?: readonly DeterminismEntry[] }).determinismEntries ?? [];
 
     // Calculate maturity signal
     const maturitySignal = this.calculateMaturity(determinismEntries);
@@ -64,7 +63,7 @@ export class AggregationEngine implements SemanticPass {
   /**
    * Calculate maturity signal from determinism entries
    */
-  private calculateMaturity(entries: DeterminismEntry[]): MaturitySignal {
+  private calculateMaturity(entries: readonly DeterminismEntry[]): MaturitySignal {
     if (entries.length === 0) {
       // Default: 100% deterministic + agnostic (no evaluation points analyzed)
       return {

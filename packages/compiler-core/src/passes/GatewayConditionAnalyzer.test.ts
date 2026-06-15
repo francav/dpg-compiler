@@ -81,7 +81,7 @@ describe("GatewayConditionAnalyzer", () => {
     expect(result.findings).toEqual([]);
   });
 
-  it("should analyze gateway nodes", () => {
+  it("emits a determinism entry per outgoing sequence-flow condition", () => {
     const nodes = new Map();
     const annotations = new Map();
 
@@ -91,9 +91,18 @@ describe("GatewayConditionAnalyzer", () => {
       astNodeId: "Gateway_1",
       flowType: "exclusiveGateway",
     };
-
     nodes.set("gw1", gateway);
-    annotations.set("gw1", {
+
+    // Conditions live on the gateway's outgoing sequence flows, not the gateway.
+    const flow1: FlowNodeIr = {
+      kind: "flowNode",
+      id: "flow1",
+      astNodeId: "Flow_1",
+      flowType: "sequenceFlow",
+    };
+    nodes.set("flow1", flow1);
+    annotations.set("flow1", {
+      sourceRef: "gw1",
       conditionExpression: "${orderTotal > 1000}",
     });
 
@@ -108,7 +117,37 @@ describe("GatewayConditionAnalyzer", () => {
 
     const result = pass.run(context);
 
-    // Should have processed the gateway (may have findings or determinism entries)
-    expect(result).toBeDefined();
+    // One condition flow → one determinism entry, keyed by the flow id.
+    expect(result.determinism).toHaveLength(1);
+    expect(result.determinism![0].evaluationPointId).toBe("flow1");
+    expect(result.determinism![0].ruleId).toBe("gateway-condition-analysis");
+  });
+
+  it("ignores conditions stored on the gateway node itself", () => {
+    const nodes = new Map();
+    const annotations = new Map();
+
+    const gateway: FlowNodeIr = {
+      kind: "flowNode",
+      id: "gw1",
+      astNodeId: "Gateway_1",
+      flowType: "exclusiveGateway",
+    };
+    nodes.set("gw1", gateway);
+    // A stray condition on the gateway annotation must NOT be treated as a flow.
+    annotations.set("gw1", { conditionExpression: "${orderTotal > 1000}" });
+
+    const context = createMockContext({
+      ir: {
+        nodes,
+        edges: [],
+        annotations,
+        state: "complete" as const,
+      },
+    });
+
+    const result = pass.run(context);
+
+    expect(result.determinism).toEqual([]);
   });
 });

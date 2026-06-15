@@ -41,11 +41,9 @@ export class GatewayConditionAnalyzer implements SemanticPass {
 
     // Analyze conditions for each gateway
     for (const gateway of gateways) {
-      const annotation = context.ir.annotations.get(gateway.id) ?? {};
-
-      // Extract sequence flow conditions from annotations
-      // (In real implementation, this would come from parser metadata)
-      const conditions = this.extractConditions(gateway, annotation);
+      // Conditions live on the gateway's outgoing sequence flows, not on the
+      // gateway node itself.
+      const conditions = this.extractConditions(gateway, context);
 
       for (const condition of conditions) {
         const classification = determinismClassifier.classify({
@@ -97,13 +95,16 @@ export class GatewayConditionAnalyzer implements SemanticPass {
   }
 
   /**
-   * Extract condition expressions from gateway annotations
+   * Extract condition expressions from the gateway's outgoing sequence flows.
    *
-   * TODO: Enhance parser to populate this metadata directly
+   * The BPMN parser records each `<sequenceFlow>`'s `conditionExpression`,
+   * `expressionLanguage`, and `sourceRef` on the flow node's annotation bag
+   * (see BpmnParser.extractConditionExpression + IrBuilder). Each condition
+   * becomes its own evaluation point keyed by the sequence-flow id.
    */
   private extractConditions(
     gateway: { id: string },
-    annotation: Record<string, unknown>,
+    context: PassContext,
   ): Array<{
     nodeId: string;
     expression: string;
@@ -115,20 +116,48 @@ export class GatewayConditionAnalyzer implements SemanticPass {
       language: "feel" | "juel" | "mvel" | "unknown";
     }> = [];
 
-    // Check annotation for condition metadata (mock for MVP)
-    const conditionExpression = annotation.conditionExpression as string | undefined;
-    if (conditionExpression) {
+    for (const [flowId, node] of context.ir.nodes.entries()) {
+      if (node.kind !== "flowNode" || node.flowType !== "sequenceFlow") {
+        continue;
+      }
+
+      const flowAnnotations = context.ir.annotations.get(flowId) as
+        | Record<string, string | undefined>
+        | undefined;
+
+      // Only flows originating from this gateway
+      if (flowAnnotations?.sourceRef !== gateway.id) {
+        continue;
+      }
+
+      const conditionExpression = flowAnnotations?.conditionExpression;
+      if (!conditionExpression) {
+        continue;
+      }
+
       conditions.push({
-        nodeId: gateway.id,
+        nodeId: flowId,
         expression: conditionExpression,
-        language: this.detectLanguage(conditionExpression),
+        language: this.resolveLanguage(conditionExpression, flowAnnotations.expressionLanguage),
       });
     }
 
-    // TODO: Parse actual sequence flows from BPMN XML
-    // This would require enhancing BpmnParser to extract <sequenceFlow><conditionExpression>
-
     return conditions;
+  }
+
+  /**
+   * Prefer an explicit expression-language annotation when it names a language
+   * we model; otherwise fall back to pattern detection.
+   */
+  private resolveLanguage(
+    expression: string,
+    explicitLanguage: string | undefined,
+  ): "feel" | "juel" | "mvel" | "unknown" {
+    const normalized = explicitLanguage?.toLowerCase();
+    if (normalized === "feel" || normalized === "juel" || normalized === "mvel") {
+      return normalized;
+    }
+    return this.detectLanguage(expression);
   }
 
   /**

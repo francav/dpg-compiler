@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { GatewaySemanticAnalyzer } from "./GatewaySemanticAnalyzer.js";
 import type { PassContext } from "./SemanticPass.js";
+import type { ExpressionDescriptor } from "../types.js";
 
 function createMockContext(overrides?: Partial<PassContext>): PassContext {
   return {
@@ -317,6 +318,27 @@ describe("GatewaySemanticAnalyzer", () => {
         state: "complete" as const,
       },
     });
+
+    // Determinism is cross-referenced from ExpressionClassifier's descriptors
+    // (keyed by sequence-flow id), which PassRunner exposes on the context.
+    (context as { expressionDescriptors?: ExpressionDescriptor[] }).expressionDescriptors = [
+      {
+        id: "expr:flow1",
+        nodeId: "flow1",
+        language: "juel",
+        text: "${orderTotal > 1000}",
+        hint: "pure",
+        determinism: "deterministic",
+      },
+      {
+        id: "expr:flow2",
+        nodeId: "flow2",
+        language: "juel",
+        text: "${service.check()}",
+        hint: "runtime",
+        determinism: "runtimeBound",
+      },
+    ];
 
     const result = await pass.run(context);
 

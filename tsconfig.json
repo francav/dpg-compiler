@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/compiler-core" },
+    { "path": "packages/compiler-node" },
+    { "path": "packages/compiler-browser" }
+  ]
+}

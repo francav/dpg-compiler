@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    targetNamespace="https://example.com/bpmn">
+    <process id="Process_Runtime" name="Runtime Bound Process">
+        <startEvent id="StartEvent_runtime">
+            <outgoing>Flow_runtime_1</outgoing>
+        </startEvent>
+        <businessRuleTask id="BusinessRuleTask_runtime" name="Runtime Decision">
+            <incoming>Flow_runtime_1</incoming>
+            <outgoing>Flow_runtime_2</outgoing>
+        </businessRuleTask>
+        <endEvent id="EndEvent_runtime">
+            <incoming>Flow_runtime_2</incoming>
+        </endEvent>
+        <sequenceFlow id="Flow_runtime_1" sourceRef="StartEvent_runtime"
+            targetRef="BusinessRuleTask_runtime" />
+        <sequenceFlow id="Flow_runtime_2" sourceRef="BusinessRuleTask_runtime"
+            targetRef="EndEvent_runtime" />
+    </process>
+</definitions>

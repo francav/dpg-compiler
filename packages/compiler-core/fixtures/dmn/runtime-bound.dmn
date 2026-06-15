@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="Definitions_Runtime" name="Runtime Dependent Decisions" namespace="https://example.com/dmn">
+  <decision id="Decision_Runtime" name="Runtime Decision">
+    <decisionTable id="DecisionTable_Runtime" hitPolicy="FIRST">
+      <input id="Input_Time" label="Current Time">
+        <inputExpression id="InputExpression_Time" typeRef="string">
+          <text>now()</text>
+        </inputExpression>
+      </input>
+      <output id="Output_Action" label="Action" typeRef="string" />
+      <rule id="Rule_Runtime_1">
+        <inputEntry id="InputEntry_Runtime_1">
+          <text>now() &lt; "2024-12-31T23:59:59"</text>
+        </inputEntry>
+        <outputEntry id="OutputEntry_Runtime_1">
+          <text>"ALLOW"</text>
+        </outputEntry>
+      </rule>
+      <rule id="Rule_Runtime_2">
+        <inputEntry id="InputEntry_Runtime_2">
+          <text>now() &gt;= "2024-12-31T23:59:59"</text>
+        </inputEntry>
+        <outputEntry id="OutputEntry_Runtime_2">
+          <text>"ESCALATE"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

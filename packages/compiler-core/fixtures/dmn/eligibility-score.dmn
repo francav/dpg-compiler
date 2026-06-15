@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
+             id="eligibility-score-definitions"
+             name="Loan Eligibility Scoring"
+             namespace="http://dpe.example/eligibility-score"
+             exporter="DPE Compiler Test Fixture">
+  
+  <decision id="eligibility-score" name="Calculate Eligibility Score">
+    <decisionTable id="DecisionTable_EligibilityScore" hitPolicy="UNIQUE">
+      
+      <!-- Input: Credit Score -->
+      <input id="Input_CreditScore" label="Credit Score" camunda:inputVariable="creditScore">
+        <inputExpression id="InputExpression_CreditScore" typeRef="number">
+          <text>creditScore</text>
+        </inputExpression>
+      </input>
+      
+      <!-- Input: Loan Amount -->
+      <input id="Input_LoanAmount" label="Loan Amount" camunda:inputVariable="loanAmount">
+        <inputExpression id="InputExpression_LoanAmount" typeRef="number">
+          <text>loanAmount</text>
+        </inputExpression>
+      </input>
+      
+      <!-- Input: Annual Income -->
+      <input id="Input_AnnualIncome" label="Annual Income" camunda:inputVariable="annualIncome">
+        <inputExpression id="InputExpression_AnnualIncome" typeRef="number">
+          <text>annualIncome</text>
+        </inputExpression>
+      </input>
+      
+      <!-- Output: Eligibility Score -->
+      <output id="Output_EligibilityScore" label="Eligibility Score" name="eligibilityScore" typeRef="number" />
+      
+      <!-- Rule 1: High credit score + reasonable loan -->
+      <rule id="Rule_1">
+        <inputEntry id="InputEntry_1_1">
+          <text>&gt;= 750</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_1_2">
+          <text>&lt;= 500000</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_1_3">
+          <text>&gt;= 75000</text>
+        </inputEntry>
+        <outputEntry id="OutputEntry_1">
+          <text>850</text>
+        </outputEntry>
+      </rule>
+      
+      <!-- Rule 2: Good credit score + moderate loan -->
+      <rule id="Rule_2">
+        <inputEntry id="InputEntry_2_1">
+          <text>[700..750)</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_2_2">
+          <text>&lt;= 300000</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_2_3">
+          <text>&gt;= 50000</text>
+        </inputEntry>
+        <outputEntry id="OutputEntry_2">
+          <text>720</text>
+        </outputEntry>
+      </rule>
+      
+      <!-- Rule 3: Fair credit score + small loan -->
+      <rule id="Rule_3">
+        <inputEntry id="InputEntry_3_1">
+          <text>[650..700)</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_3_2">
+          <text>&lt;= 150000</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_3_3">
+          <text>&gt;= 40000</text>
+        </inputEntry>
+        <outputEntry id="OutputEntry_3">
+          <text>650</text>
+        </outputEntry>
+      </rule>
+      
+      <!-- Rule 4: Low credit score (catchall for rejected) -->
+      <rule id="Rule_4">
+        <inputEntry id="InputEntry_4_1">
+          <text>&lt; 650</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_4_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="InputEntry_4_3">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="OutputEntry_4">
+          <text>400</text>
+        </outputEntry>
+      </rule>
+      
+      <!-- GAP: Missing null handling for creditScore, loanAmount, annualIncome -->
+      <!-- GAP: No rule covers case where creditScore >= 650 but loan/income don't match -->
+      
+    </decisionTable>
+  </decision>
+  
+</definitions>

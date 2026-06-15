@@ -19,5 +19,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@dpg/compiler-core": "*"
   }
 }

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+    xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+    xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+    xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    id="Definitions_loan_preapproval"
+    targetNamespace="http://dpe.example/loan-preapproval"
+    exporter="DPE Compiler Test Fixture">
+    <bpmn:process id="loan-preapproval" name="Loan Pre-Approval Process" isExecutable="true">
+
+        <!-- Start Event -->
+        <bpmn:startEvent id="StartEvent_1" name="Loan Application Received">
+            <bpmn:outgoing>Flow_1</bpmn:outgoing>
+        </bpmn:startEvent>
+
+        <!-- Service Task: Credit Check (missing contract) -->
+        <bpmn:serviceTask id="ServiceTask_CreditCheck" name="Check Credit Score"
+            camunda:type="external" camunda:topic="credit-check">
+            <bpmn:incoming>Flow_1</bpmn:incoming>
+            <bpmn:outgoing>Flow_2</bpmn:outgoing>
+        </bpmn:serviceTask>
+
+        <!-- Business Rule Task: Eligibility Decision (DMN reference) -->
+        <bpmn:businessRuleTask id="BusinessRuleTask_Eligibility" name="Calculate Eligibility Score"
+            camunda:decisionRef="eligibility-score">
+            <bpmn:incoming>Flow_2</bpmn:incoming>
+            <bpmn:outgoing>Flow_3</bpmn:outgoing>
+        </bpmn:businessRuleTask>
+
+        <!-- Exclusive Gateway: Risk Assessment (FEEL condition - deterministic) -->
+        <bpmn:exclusiveGateway id="Gateway_RiskCheck" name="Low Risk?">
+            <bpmn:incoming>Flow_3</bpmn:incoming>
+            <bpmn:outgoing>Flow_4_LowRisk</bpmn:outgoing>
+            <bpmn:outgoing>Flow_5_HighRisk</bpmn:outgoing>
+        </bpmn:exclusiveGateway>
+
+        <!-- Script Task: Calculate Interest Rate (non-deterministic - uses new Date()) -->
+        <bpmn:scriptTask id="ScriptTask_InterestRate" name="Calculate Interest Rate"
+            scriptFormat="groovy">
+            <bpmn:incoming>Flow_4_LowRisk</bpmn:incoming>
+            <bpmn:outgoing>Flow_6</bpmn:outgoing>
+            <bpmn:script>
+                // Non-deterministic: uses current date for rate calculation
+                def today = new Date()
+                def baseRate = 3.5
+                def seasonalAdjustment = (today.getMonth() &gt; 6) ? 0.2 : -0.1
+                execution.setVariable("interestRate", baseRate + seasonalAdjustment)
+            </bpmn:script>
+        </bpmn:scriptTask>
+
+        <!-- Service Task: Manual Review Request (missing contract) -->
+        <bpmn:serviceTask id="ServiceTask_ManualReview" name="Request Manual Review"
+            camunda:type="external" camunda:topic="manual-review">
+            <bpmn:incoming>Flow_5_HighRisk</bpmn:incoming>
+            <bpmn:outgoing>Flow_7</bpmn:outgoing>
+        </bpmn:serviceTask>
+
+        <!-- Exclusive Gateway: Approval Decision (JUEL condition - runtime-bound) -->
+        <bpmn:exclusiveGateway id="Gateway_Approval" name="Approved?">
+            <bpmn:incoming>Flow_6</bpmn:incoming>
+            <bpmn:incoming>Flow_7</bpmn:incoming>
+            <bpmn:outgoing>Flow_8_Approved</bpmn:outgoing>
+            <bpmn:outgoing>Flow_9_Rejected</bpmn:outgoing>
+        </bpmn:exclusiveGateway>
+
+        <!-- User Task: Send Approval Letter -->
+        <bpmn:userTask id="UserTask_SendApproval" name="Send Approval Letter">
+            <bpmn:incoming>Flow_8_Approved</bpmn:incoming>
+            <bpmn:outgoing>Flow_10</bpmn:outgoing>
+        </bpmn:userTask>
+
+        <!-- User Task: Send Rejection Letter -->
+        <bpmn:userTask id="UserTask_SendRejection" name="Send Rejection Letter">
+            <bpmn:incoming>Flow_9_Rejected</bpmn:incoming>
+            <bpmn:outgoing>Flow_11</bpmn:outgoing>
+        </bpmn:userTask>
+
+        <!-- End Event: Approved -->
+        <bpmn:endEvent id="EndEvent_Approved" name="Loan Pre-Approved">
+            <bpmn:incoming>Flow_10</bpmn:incoming>
+        </bpmn:endEvent>
+
+        <!-- End Event: Rejected -->
+        <bpmn:endEvent id="EndEvent_Rejected" name="Loan Rejected">
+            <bpmn:incoming>Flow_11</bpmn:incoming>
+        </bpmn:endEvent>
+
+        <!-- Sequence Flows -->
+        <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="ServiceTask_CreditCheck" />
+        <bpmn:sequenceFlow id="Flow_2" sourceRef="ServiceTask_CreditCheck"
+            targetRef="BusinessRuleTask_Eligibility" />
+        <bpmn:sequenceFlow id="Flow_3" sourceRef="BusinessRuleTask_Eligibility"
+            targetRef="Gateway_RiskCheck" />
+
+        <!-- FEEL condition: deterministic + profile-scoped -->
+        <bpmn:sequenceFlow id="Flow_4_LowRisk" name="Yes" sourceRef="Gateway_RiskCheck"
+            targetRef="ScriptTask_InterestRate">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">eligibilityScore
+                &gt; 700</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+
+        <!-- Default flow -->
+        <bpmn:sequenceFlow id="Flow_5_HighRisk" name="No" sourceRef="Gateway_RiskCheck"
+            targetRef="ServiceTask_ManualReview" />
+
+        <bpmn:sequenceFlow id="Flow_6" sourceRef="ScriptTask_InterestRate"
+            targetRef="Gateway_Approval" />
+        <bpmn:sequenceFlow id="Flow_7" sourceRef="ServiceTask_ManualReview"
+            targetRef="Gateway_Approval" />
+
+        <!-- JUEL condition: deterministic + runtime-bound -->
+        <bpmn:sequenceFlow id="Flow_8_Approved" name="Yes" sourceRef="Gateway_Approval"
+            targetRef="UserTask_SendApproval">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == true}</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+
+        <!-- Default flow -->
+        <bpmn:sequenceFlow id="Flow_9_Rejected" name="No" sourceRef="Gateway_Approval"
+            targetRef="UserTask_SendRejection" />
+
+        <bpmn:sequenceFlow id="Flow_10" sourceRef="UserTask_SendApproval"
+            targetRef="EndEvent_Approved" />
+        <bpmn:sequenceFlow id="Flow_11" sourceRef="UserTask_SendRejection"
+            targetRef="EndEvent_Rejected" />
+
+    </bpmn:process>
+
+    <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+        <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="loan-preapproval">
+            <!-- Diagram layout omitted for brevity -->
+        </bpmndi:BPMNPlane>
+    </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -3,7 +3,14 @@
 
 import type { DecisionAnalysisEntry, Finding } from "../types.js";
 import { finalizeFinding } from "../parser/findingHelpers.js";
+import { parseUnaryTest, intersects, subsumes, type Region } from "./feel/UnaryTestRange.js";
 import type { PassContext, PassOutput, SemanticPass } from "./SemanticPass.js";
+
+type DecisionRule = {
+  id: string;
+  inputEntries: Record<string, string>;
+  outputEntries?: Record<string, string>;
+};
 
 /**
  * DMN Gap Analyzer
@@ -16,6 +23,11 @@ import type { PassContext, PassOutput, SemanticPass } from "./SemanticPass.js";
  * - Analyze rule coverage (missing null handling, overlapping rules, unreachable rules)
  * - Emit DecisionAnalysisEntry with gap metadata
  * - Emit findings with ruleId: "DMN_GAP_DETECTION"
+ *
+ * Overlap and shadow detection compare rule input regions with the shared FEEL
+ * {@link UnaryTestRange} comparator (real range/interval subsumption), not byte-equality.
+ * When a column's unary test cannot be analyzed, the column is treated as "unknown" and
+ * never contributes a false overlap/unreachable claim.
  */
 export class DmnGapAnalyzer implements SemanticPass {
   readonly id = "dmn-gap-analysis";
@@ -45,17 +57,12 @@ export class DmnGapAnalyzer implements SemanticPass {
 
       // Extract decision metadata (would come from parser in real implementation)
       const inputs = (annotation.inputs as string[]) ?? [];
-      const rules =
-        (annotation.rules as Array<{
-          id: string;
-          inputEntries: Record<string, string>;
-          outputEntries: Record<string, string>;
-        }>) ?? [];
+      const rules = (annotation.rules as DecisionRule[]) ?? [];
 
       // Detect gaps
       const missingCombinations = this.detectNullGaps(inputs, rules);
       const overlappingRules = this.detectOverlappingRules(decisionNode.hitPolicy, rules);
-      const unreachableRules = this.detectUnreachableRules(decisionNode.hitPolicy, rules);
+      const shadowedRules = this.detectShadowedRules(decisionNode.hitPolicy, rules);
 
       // Count overlaps and gaps (legacy fields)
       const overlaps = overlappingRules.length;
@@ -68,15 +75,16 @@ export class DmnGapAnalyzer implements SemanticPass {
         severity = tier >= 3 ? "error" : tier >= 2 ? "warning" : "info";
       }
 
-      // Create decision analysis entry
+      // Create decision analysis entry. Shadowed rules are unreachable: an earlier rule
+      // fully subsumes them under an order-sensitive hit policy.
       decisionAnalysis.push({
         decisionId: decisionNode.id,
         hitPolicy: decisionNode.hitPolicy,
         rules: rules.length,
         overlaps,
         gaps,
-        unreachableRules: unreachableRules.map((r) => r.id),
-        shadowedRules: [], // Would be populated by shadow analysis
+        unreachableRules: shadowedRules.map((r) => r.id),
+        shadowedRules: shadowedRules.map((r) => r.id),
         runtimeDependence: "profileScoped", // DMN is profile-scoped (FEEL)
         severity,
         policyClause: "dmn.completeness",
@@ -116,12 +124,12 @@ export class DmnGapAnalyzer implements SemanticPass {
       }
 
       // Emit findings for unreachable rules
-      if (unreachableRules.length > 0 && tier >= 2) {
+      if (shadowedRules.length > 0 && tier >= 2) {
         findings.push(
           finalizeFinding({
             category: "semantic",
             severity: "warning",
-            message: `Decision table "${decisionNode.id}" has ${unreachableRules.length} unreachable rule(s) (shadowed by earlier rules)`,
+            message: `Decision table "${decisionNode.id}" has ${shadowedRules.length} unreachable rule(s) (shadowed by earlier rules)`,
             ruleId: "DMN_GAP_DETECTION",
             targetId: decisionNode.id,
             policyClause: "dmn.completeness",
@@ -165,27 +173,28 @@ export class DmnGapAnalyzer implements SemanticPass {
   }
 
   /**
-   * Detect overlapping rules (simplified MVP - checks for duplicate conditions)
+   * Detect overlapping rules via real region intersection.
+   *
+   * Two rules overlap when EVERY input column's unary tests can match a common value.
+   * FIRST allows shadowing by design, so overlap is not flagged there. A column whose
+   * test cannot be parsed is treated as "unknown" and prevents an overlap claim for that
+   * pair — we never report an overlap we cannot prove.
    */
-  private detectOverlappingRules(
-    hitPolicy: string,
-    rules: Array<{ id: string; inputEntries: Record<string, string> }>,
-  ): Array<{ id: string }> {
-    const overlapping: Array<{ id: string }> = [];
-
-    // Only check for UNIQUE/ANY hit policies (FIRST allows shadowing intentionally)
+  private detectOverlappingRules(hitPolicy: string, rules: DecisionRule[]): Array<{ id: string }> {
     if (hitPolicy === "FIRST") {
-      return overlapping;
+      return [];
     }
 
-    // Simple duplicate detection (real implementation would check range overlaps)
-    const seen = new Set<string>();
-    for (const rule of rules) {
-      const signature = JSON.stringify(rule.inputEntries);
-      if (seen.has(signature)) {
-        overlapping.push({ id: rule.id });
-      } else {
-        seen.add(signature);
+    const regions = rules.map((rule) => this.toRuleRegions(rule.inputEntries));
+    const columns = this.collectColumns(rules);
+    const overlapping: Array<{ id: string }> = [];
+
+    for (let i = 0; i < rules.length; i++) {
+      for (let j = 0; j < i; j++) {
+        if (this.rulesOverlap(regions[i]!, regions[j]!, columns)) {
+          overlapping.push({ id: rules[i]!.id });
+          break; // already overlaps an earlier rule; count it once
+        }
       }
     }
 
@@ -193,34 +202,86 @@ export class DmnGapAnalyzer implements SemanticPass {
   }
 
   /**
-   * Detect unreachable rules (basic shadow analysis for FIRST hit policy)
+   * Detect rules made unreachable by an earlier, more general rule.
+   *
+   * Only order-sensitive hit policies (FIRST, PRIORITY) can shadow later rules. A rule is
+   * reported when some earlier rule fully subsumes it on every input column. Subsumption is
+   * sound-but-incomplete (it checks against single earlier rules, not their union), so it
+   * never produces a false "unreachable" claim.
    */
-  private detectUnreachableRules(
-    hitPolicy: string,
-    rules: Array<{ id: string; inputEntries: Record<string, string> }>,
-  ): Array<{ id: string }> {
-    const unreachable: Array<{ id: string }> = [];
-
-    // Only relevant for FIRST hit policy (later rules can be shadowed)
-    if (hitPolicy !== "FIRST") {
-      return unreachable;
+  private detectShadowedRules(hitPolicy: string, rules: DecisionRule[]): Array<{ id: string }> {
+    if (hitPolicy !== "FIRST" && hitPolicy !== "PRIORITY") {
+      return [];
     }
 
-    // Simplified: check if rule N+1 is identical to rule N (full subsumption check is complex)
+    const regions = rules.map((rule) => this.toRuleRegions(rule.inputEntries));
+    const columns = this.collectColumns(rules);
+    const shadowed: Array<{ id: string }> = [];
+
     for (let i = 1; i < rules.length; i++) {
-      const rule = rules[i];
-      const prior = rules[i - 1];
-      if (!rule || !prior) {
-        continue;
-      }
-      const current = JSON.stringify(rule.inputEntries);
-      const previous = JSON.stringify(prior.inputEntries);
-      if (current === previous) {
-        unreachable.push({ id: rule.id });
+      for (let j = 0; j < i; j++) {
+        if (this.ruleSubsumes(regions[j]!, regions[i]!, columns)) {
+          shadowed.push({ id: rules[i]!.id });
+          break;
+        }
       }
     }
 
-    return unreachable;
+    return shadowed;
+  }
+
+  /** Parse each input column's unary test into a Region (null = unparseable). */
+  private toRuleRegions(inputEntries: Record<string, string>): Record<string, Region | null> {
+    const regions: Record<string, Region | null> = {};
+    for (const [column, test] of Object.entries(inputEntries)) {
+      regions[column] = parseUnaryTest(test);
+    }
+    return regions;
+  }
+
+  /** Union of every input column name across all rules. */
+  private collectColumns(rules: DecisionRule[]): string[] {
+    const columns = new Set<string>();
+    for (const rule of rules) {
+      for (const column of Object.keys(rule.inputEntries)) columns.add(column);
+    }
+    return Array.from(columns);
+  }
+
+  /** Rules overlap when every column intersects; a missing column is unconstrained (any). */
+  private rulesOverlap(
+    a: Record<string, Region | null>,
+    b: Record<string, Region | null>,
+    columns: string[],
+  ): boolean {
+    for (const column of columns) {
+      const ra = a[column];
+      const rb = b[column];
+      // A missing entry constrains nothing → behaves like "any" → always intersects.
+      if (ra === undefined || rb === undefined) continue;
+      // An unparseable column means we cannot prove an overlap exists.
+      if (ra === null || rb === null) return false;
+      if (!intersects(ra, rb)) return false;
+    }
+    return true;
+  }
+
+  /** `outer` subsumes `inner` when it contains inner on every column. */
+  private ruleSubsumes(
+    outer: Record<string, Region | null>,
+    inner: Record<string, Region | null>,
+    columns: string[],
+  ): boolean {
+    for (const column of columns) {
+      const outerRegion = outer[column];
+      const innerRegion = inner[column];
+      // Missing outer entry = unconstrained = contains anything on this column.
+      if (outerRegion === undefined) continue;
+      // Unparseable on either side → cannot prove subsumption.
+      if (outerRegion === null || innerRegion === null || innerRegion === undefined) return false;
+      if (!subsumes(outerRegion, innerRegion)) return false;
+    }
+    return true;
   }
 
   /**

@@ -117,6 +117,9 @@ describe("DmnRuleAggregator", () => {
       "deterministic",
       "deterministic",
     ]);
+    // Overlap detection now lives in DmnGapAnalyzer; this pass must not emit the old
+    // misleading "not yet implemented" note for UNIQUE.
+    expect(output.findings!.some((f) => f.message.includes("not yet implemented"))).toBe(false);
   });
 
   it("aggregates FIRST hit policy with first rule policyDependent", () => {

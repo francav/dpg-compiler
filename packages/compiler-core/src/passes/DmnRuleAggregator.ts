@@ -88,14 +88,8 @@ export class DmnRuleAggregator implements SemanticPass {
         ruleDeterminism.push(ruleDet);
       }
 
-      // Apply hit policy logic to compute decision-level determinism
-      const decisionDeterminism = this.applyHitPolicyLogic(
-        hitPolicy,
-        ruleDeterminism,
-        decisionNode.id,
-        findings,
-        tier,
-      );
+      // Apply hit policy logic to compute decision-level determinism.
+      const decisionDeterminism = this.applyHitPolicyLogic(hitPolicy, ruleDeterminism);
 
       descriptors.push({
         decisionId: decisionNode.id,
@@ -109,20 +103,10 @@ export class DmnRuleAggregator implements SemanticPass {
         outputCount,
       });
 
-      // Emit findings for specific hit policies
-      if (hitPolicy === "UNIQUE" && ruleNodes.length > 1 && tier >= 2) {
-        findings.push(
-          finalizeFinding({
-            category: "semantic",
-            severity: "info",
-            message: `Decision ${decisionNode.id} uses UNIQUE hit policy with ${ruleNodes.length} rules. Rule overlap detection not yet implemented.`,
-            targetId: decisionNode.id,
-            ruleId: this.id,
-            policyClause: "dmn-hit-policy",
-          }),
-        );
-      }
-
+      // Hit-policy findings. Rule overlap / mutual-exclusivity for UNIQUE is detected by
+      // DmnGapAnalyzer (real range subsumption via the shared FEEL comparator) — the single
+      // source of truth for overlap. This pass only owns determinism aggregation, so it no
+      // longer emits a misleading "overlap detection not yet implemented" note for UNIQUE.
       if (hitPolicy === "ANY" && this.hasInconsistentRules(ruleDeterminism) && tier >= 2) {
         findings.push(
           finalizeFinding({
@@ -176,57 +160,30 @@ export class DmnRuleAggregator implements SemanticPass {
   }
 
   /**
-   * Apply hit policy logic to compute decision-level determinism
+   * Apply hit policy logic to compute decision-level determinism.
    *
-   * Hit Policy Semantics (Sprint 4):
-   * - UNIQUE: all rules must be mutually exclusive (emit warning if overlap detected)
-   * - FIRST: determinism = first matching rule's determinism
-   * - PRIORITY: determinism = least deterministic priority rule
-   * - ANY: all rules must produce same determinism (emit warning if inconsistent)
-   * - COLLECT: determinism = least deterministic across all rules
-   * - RULE ORDER: determinism = aggregated across rule execution sequence
-   * - OUTPUT ORDER: determinism = aggregated across output ordering
+   * Determinism is the axis-Y class a caller can rely on regardless of which rule fires.
+   * Only FIRST has a statically-known winner (the first rule); every other policy may
+   * surface any matching rule's result, so the only sound classification is the least
+   * deterministic across all rules:
+   * - FIRST: determinism = first rule's determinism (order decides the single winner)
+   * - UNIQUE: exactly one rule matches, but which one is data-dependent → least deterministic
+   *   (mutual-exclusivity is validated separately in DmnGapAnalyzer)
+   * - PRIORITY / ANY / COLLECT / RULE ORDER / OUTPUT ORDER: any/all rules may contribute →
+   *   least deterministic across all rules
    */
-  private applyHitPolicyLogic(
-    hitPolicy: string,
-    ruleDeterminism: AxisYClass[],
-    _decisionId: string,
-    _findings: Finding[],
-    _tier: number,
-  ): AxisYClass {
+  private applyHitPolicyLogic(hitPolicy: string, ruleDeterminism: AxisYClass[]): AxisYClass {
     if (ruleDeterminism.length === 0) {
       return "deterministic"; // No rules = deterministic (vacuously true)
     }
 
-    switch (hitPolicy) {
-      case "UNIQUE":
-        // UNIQUE: all rules must be mutually exclusive
-        // For Sprint 4 MVP, we treat this as COLLECT (least deterministic)
-        return this.leastDeterministic(ruleDeterminism);
-
-      case "FIRST":
-        // FIRST: determinism = first matching rule's determinism
-        return ruleDeterminism[0] ?? "deterministic";
-
-      case "PRIORITY":
-        // PRIORITY: determinism = least deterministic priority rule
-        return this.leastDeterministic(ruleDeterminism);
-
-      case "ANY":
-        // ANY: all rules must have same determinism
-        // If inconsistent, use least deterministic
-        return this.leastDeterministic(ruleDeterminism);
-
-      case "COLLECT":
-      case "RULE ORDER":
-      case "OUTPUT ORDER":
-        // COLLECT/RULE ORDER/OUTPUT ORDER: determinism = least deterministic across all rules
-        return this.leastDeterministic(ruleDeterminism);
-
-      default:
-        // Unknown hit policy
-        return this.leastDeterministic(ruleDeterminism);
+    if (hitPolicy === "FIRST") {
+      return ruleDeterminism[0] ?? "deterministic";
     }
+
+    // UNIQUE, PRIORITY, ANY, COLLECT, RULE ORDER, OUTPUT ORDER, and unknown policies all
+    // resolve to the least deterministic rule — the only result guaranteed to hold.
+    return this.leastDeterministic(ruleDeterminism);
   }
 
   /**

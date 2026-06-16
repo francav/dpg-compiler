@@ -30,6 +30,6 @@ jobs:
             echo "Tag $tag does not match package version $version" >&2
             exit 1
           fi
-      - run: npm publish --workspace @dpg/compiler-core --access public --provenance
-      - run: npm publish --workspace @dpg/compiler-browser --access public --provenance
-      - run: npm publish --workspace @dpg/compiler-node --access public --provenance
+      - run: npm publish --workspace @francav/compiler-core --access public --provenance
+      - run: npm publish --workspace @francav/compiler-browser --access public --provenance
+      - run: npm publish --workspace @francav/compiler-node --access public --provenance

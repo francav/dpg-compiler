@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Victor França
 
-import type { CompileOptions, CompilerResult } from "@dpg/compiler-core";
+import type { CompileOptions, CompilerResult } from "@francav/compiler-core";
 
 export type BrowserCompileOptions = CompileOptions;
 

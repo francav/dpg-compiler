@@ -1,7 +1,7 @@
-# @dpg/compiler-browser
+# @francav/compiler-browser
 
 Browser entrypoint for the DPG compiler. It wraps the host-agnostic analysis
-from `@dpg/compiler-core` for use in the browser: `compileModelInBrowser`
+from `@francav/compiler-core` for use in the browser: `compileModelInBrowser`
 runs a single analysis from in-memory XML, and `BrowserCompilerClient`
 together with `createCompilerWorker` runs the compiler off the main thread in
 a Web Worker.
@@ -9,13 +9,13 @@ a Web Worker.
 ## Install
 
 ```sh
-npm install @dpg/compiler-browser
+npm install @francav/compiler-browser
 ```
 
 ## Usage
 
 ```ts
-import { compileModelInBrowser } from "@dpg/compiler-browser";
+import { compileModelInBrowser } from "@francav/compiler-browser";
 
 const result = await compileModelInBrowser({
   modelId: "order-process",

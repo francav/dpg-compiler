@@ -9,9 +9,9 @@ Early development (0.1.0). APIs are unstable and subject to change.
 
 ## Packages
 
-- `@dpg/compiler-core` — host-agnostic analysis core
-- `@dpg/compiler-node` — Node.js filesystem adapter
-- `@dpg/compiler-browser` — browser / Web Worker adapter
+- `@francav/compiler-core` — host-agnostic analysis core
+- `@francav/compiler-node` — Node.js filesystem adapter
+- `@francav/compiler-browser` — browser / Web Worker adapter
 
 ## Develop
 

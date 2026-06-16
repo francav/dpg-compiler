@@ -3,7 +3,7 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { compileModel, type CompileOptions, type CompilerResult } from "@dpg/compiler-core";
+import { compileModel, type CompileOptions, type CompilerResult } from "@francav/compiler-core";
 
 export interface CompileFromFilesOptions {
   readonly modelId: string;

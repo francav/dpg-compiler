@@ -1,4 +1,4 @@
-# @dpg/compiler-core
+# @francav/compiler-core
 
 Host-agnostic engine that analyzes BPMN and DMN models for execution
 determinism. It parses a process model, builds an intermediate
@@ -12,13 +12,13 @@ browser-specific dependencies; supply the model XML directly.
 ## Install
 
 ```sh
-npm install @dpg/compiler-core
+npm install @francav/compiler-core
 ```
 
 ## Usage
 
 ```ts
-import { compileModel } from "@dpg/compiler-core";
+import { compileModel } from "@francav/compiler-core";
 
 const result = await compileModel({
   modelId: "order-process",

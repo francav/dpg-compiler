@@ -13,7 +13,7 @@ async function importCompiler() {
     return module.compileModel;
   } catch (error) {
     console.error(
-      "Compiler build artifacts not found. Run 'npm run build --workspace @dpg/compiler-core' first.",
+      "Compiler build artifacts not found. Run 'npm run build --workspace @francav/compiler-core' first.",
     );
     throw error;
   }

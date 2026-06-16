@@ -1,5 +1,5 @@
 {
-  "name": "@dpg/compiler-browser",
+  "name": "@francav/compiler-browser",
   "version": "0.1.0",
   "description": "DPG compiler browser bindings: load and run BPMN/DMN determinism analysis in the browser",
   "license": "Apache-2.0",
@@ -33,6 +33,6 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@dpg/compiler-core": "^0.1.0"
+    "@francav/compiler-core": "^0.1.0"
   }
 }

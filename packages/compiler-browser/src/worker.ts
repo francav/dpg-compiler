@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Victor França
 
-import { compileModel } from "@dpg/compiler-core";
+import { compileModel } from "@francav/compiler-core";
 import type {
   BrowserWorkerRequest,
   BrowserWorkerResponse,

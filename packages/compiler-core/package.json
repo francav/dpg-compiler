@@ -1,6 +1,6 @@
 {
   "name": "@francav/compiler-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DPG compiler core: host-agnostic BPMN/DMN determinism analysis",
   "license": "Apache-2.0",
   "author": "Victor França",

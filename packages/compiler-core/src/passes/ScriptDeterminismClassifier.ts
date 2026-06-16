@@ -97,11 +97,11 @@ export class ScriptDeterminismClassifier implements SemanticPass {
 
       // Override Axis Y if non-deterministic patterns detected
       let finalAxisY = classification.axisY;
-      let _reasoning = classification.reasoning;
+      let reasoning = classification.reasoning;
 
       if (detectedPatterns.length > 0) {
         finalAxisY = "nonDeterministic";
-        _reasoning = `Non-deterministic patterns detected: ${detectedPatterns.join(", ")}`;
+        reasoning = `Non-deterministic patterns detected: ${detectedPatterns.join(", ")}`;
       }
 
       determinism.push({
@@ -112,6 +112,7 @@ export class ScriptDeterminismClassifier implements SemanticPass {
         policyClause: "determinism.scriptTaskRestrictions",
         runtimeProfileSection: context.compilerContext.runtimeProfile ? "scriptTasks" : undefined,
         ruleId: this.id,
+        rationale: reasoning,
       });
 
       // Emit finding if patterns detected and policy restricts

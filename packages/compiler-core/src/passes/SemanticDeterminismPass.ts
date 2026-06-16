@@ -31,6 +31,9 @@ export class SemanticDeterminismPass implements SemanticPass {
         policyClause: "determinism.default",
         runtimeProfileSection: context.compilerContext.runtimeProfile ? "root" : undefined,
         ruleId: this.id,
+        rationale: runtimeBound
+          ? "Policy-driven evaluation point with a runtime-bound expression hint"
+          : "Policy-driven evaluation point; determinism depends on policy declarations",
       });
       runtimeDependencies.push({
         evaluationPointId: node.id,

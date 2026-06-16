@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    targetNamespace="https://example.com/bpmn">
+    <process id="Process_Sub" name="Sub-Process Process">
+        <startEvent id="StartEvent_sub">
+            <outgoing>Flow_s1</outgoing>
+        </startEvent>
+        <subProcess id="SubProcess_Embedded" name="Handle Order">
+            <incoming>Flow_s1</incoming>
+            <outgoing>Flow_s2</outgoing>
+            <startEvent id="SubStart_1">
+                <outgoing>SubFlow_1</outgoing>
+            </startEvent>
+            <task id="SubTask_1" name="Inner Step">
+                <incoming>SubFlow_1</incoming>
+                <outgoing>SubFlow_2</outgoing>
+            </task>
+            <endEvent id="SubEnd_1">
+                <incoming>SubFlow_2</incoming>
+            </endEvent>
+        </subProcess>
+        <endEvent id="EndEvent_sub">
+            <incoming>Flow_s2</incoming>
+        </endEvent>
+        <sequenceFlow id="Flow_s1" sourceRef="StartEvent_sub" targetRef="SubProcess_Embedded" />
+        <sequenceFlow id="Flow_s2" sourceRef="SubProcess_Embedded" targetRef="EndEvent_sub" />
+    </process>
+</definitions>

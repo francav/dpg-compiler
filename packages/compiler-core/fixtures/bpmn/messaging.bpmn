@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    targetNamespace="https://example.com/bpmn">
+    <process id="Process_Messaging" name="Messaging Process">
+        <startEvent id="StartEvent_msg">
+            <outgoing>Flow_m1</outgoing>
+        </startEvent>
+        <receiveTask id="ReceiveTask_Order" name="Await Order">
+            <incoming>Flow_m1</incoming>
+            <outgoing>Flow_m2</outgoing>
+        </receiveTask>
+        <intermediateCatchEvent id="CatchEvent_Payment" name="Payment Confirmed">
+            <incoming>Flow_m2</incoming>
+            <outgoing>Flow_m3</outgoing>
+            <messageEventDefinition id="MsgDef_1" />
+        </intermediateCatchEvent>
+        <sendTask id="SendTask_Ack" name="Send Acknowledgement">
+            <incoming>Flow_m3</incoming>
+            <outgoing>Flow_m4</outgoing>
+        </sendTask>
+        <intermediateThrowEvent id="ThrowEvent_Notify" name="Notify Partner">
+            <incoming>Flow_m4</incoming>
+            <outgoing>Flow_m5</outgoing>
+            <messageEventDefinition id="MsgDef_2" />
+        </intermediateThrowEvent>
+        <endEvent id="EndEvent_msg">
+            <incoming>Flow_m5</incoming>
+        </endEvent>
+        <sequenceFlow id="Flow_m1" sourceRef="StartEvent_msg" targetRef="ReceiveTask_Order" />
+        <sequenceFlow id="Flow_m2" sourceRef="ReceiveTask_Order" targetRef="CatchEvent_Payment" />
+        <sequenceFlow id="Flow_m3" sourceRef="CatchEvent_Payment" targetRef="SendTask_Ack" />
+        <sequenceFlow id="Flow_m4" sourceRef="SendTask_Ack" targetRef="ThrowEvent_Notify" />
+        <sequenceFlow id="Flow_m5" sourceRef="ThrowEvent_Notify" targetRef="EndEvent_msg" />
+    </process>
+</definitions>

@@ -30,12 +30,21 @@ describe("compileModel", () => {
     expect(result.determinismMap.length).toBeGreaterThanOrEqual(1);
     expect(result.summary.structuralErrors).toBe(0);
 
-    // Service tasks may have unknown implementation (axisY = "unknown")
-    // Other evaluation points should be policyDependent
-    const businessRuleEntries = result.determinismMap.filter(
-      (e) => e.policyClause !== "service-task-determinism",
+    // Service tasks may have unknown implementation (axisY = "unknown").
+    // Since WU-F.2 every execution-bearing element is classified: the DMN/
+    // businessRule evaluation points remain policyDependent, while inert
+    // start/end events are deterministic pass-throughs.
+    const evalPointEntries = result.determinismMap.filter((e) =>
+      e.evaluationPointId.includes(":evaluation"),
     );
-    expect(businessRuleEntries.every((entry) => entry.axisY === "policyDependent")).toBe(true);
+    expect(evalPointEntries.length).toBeGreaterThan(0);
+    expect(evalPointEntries.every((entry) => entry.axisY === "policyDependent")).toBe(true);
+
+    const eventEntries = result.determinismMap.filter((e) => e.evaluationPointId.includes("Event"));
+    expect(eventEntries.every((entry) => entry.axisY === "deterministic")).toBe(true);
+
+    // Every emitted entry carries a rationale (WU-F.2 done-criterion).
+    expect(result.determinismMap.every((entry) => Boolean(entry.rationale))).toBe(true);
   });
 
   it("falls back to default governance artifacts when omitted", async () => {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    targetNamespace="https://example.com/bpmn">
+    <process id="Process_Call" name="Call Activity Process">
+        <startEvent id="StartEvent_call">
+            <outgoing>Flow_c1</outgoing>
+        </startEvent>
+        <callActivity id="CallActivity_Sub" name="Run Sub-Process" calledElement="Process_Other">
+            <incoming>Flow_c1</incoming>
+            <outgoing>Flow_c2</outgoing>
+        </callActivity>
+        <endEvent id="EndEvent_call">
+            <incoming>Flow_c2</incoming>
+        </endEvent>
+        <sequenceFlow id="Flow_c1" sourceRef="StartEvent_call" targetRef="CallActivity_Sub" />
+        <sequenceFlow id="Flow_c2" sourceRef="CallActivity_Sub" targetRef="EndEvent_call" />
+    </process>
+</definitions>

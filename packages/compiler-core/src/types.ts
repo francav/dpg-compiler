@@ -328,6 +328,12 @@ export interface DeterminismEntry {
   readonly policyClause: string;
   readonly runtimeProfileSection?: string;
   readonly ruleId: string;
+  /**
+   * Human-readable justification naming the source of (non-)determinism for this
+   * evaluation point (e.g. "Human input is an uncontrolled input"). Optional for
+   * backward compatibility with legacy producers; new passes always set it.
+   */
+  readonly rationale?: string;
 }
 
 export interface RuntimeDependencyEntry {

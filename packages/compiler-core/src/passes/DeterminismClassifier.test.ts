@@ -187,4 +187,85 @@ describe("DeterminismClassifier", () => {
       expect(result.confidence).toBeLessThan(0.7);
     });
   });
+
+  describe("First-principles flow-element classification (WU-F.2)", () => {
+    it("unconstrained userTask is non-deterministic (human is uncontrolled input)", () => {
+      const result = classifier.classify({ elementType: "userTask", policyTier: 1 });
+      expect(result.axisY).toBe("nonDeterministic");
+      expect(result.axisX).toBe("engineAgnostic");
+      expect(result.reasoning).toContain("uncontrolled input");
+    });
+
+    it("form-constrained userTask upgrades to policyDependent / profileScoped", () => {
+      const result = classifier.classify({
+        elementType: "userTask",
+        formConstrained: true,
+        policyTier: 1,
+      });
+      expect(result.axisY).toBe("policyDependent");
+      expect(result.axisX).toBe("profileScoped");
+    });
+
+    it("receiveTask is non-deterministic and externalized", () => {
+      const result = classifier.classify({ elementType: "receiveTask", policyTier: 1 });
+      expect(result.axisY).toBe("nonDeterministic");
+      expect(result.axisX).toBe("externalized");
+    });
+
+    it("sendTask is a deterministic, externally-coupled emission", () => {
+      const result = classifier.classify({ elementType: "sendTask", policyTier: 1 });
+      expect(result.axisY).toBe("deterministic");
+      expect(result.axisX).toBe("externalized");
+    });
+
+    it("message intermediate event is non-deterministic and externalized", () => {
+      const result = classifier.classify({
+        elementType: "intermediateCatchEvent",
+        eventDefinition: "message",
+        policyTier: 1,
+      });
+      expect(result.axisY).toBe("nonDeterministic");
+      expect(result.axisX).toBe("externalized");
+    });
+
+    it("timer event is runtime-bound", () => {
+      const withProfile = classifier.classify({
+        elementType: "startEvent",
+        eventDefinition: "timer",
+        profileId: "camunda-7",
+        policyTier: 1,
+      });
+      expect(withProfile.axisY).toBe("runtimeBound");
+      expect(withProfile.axisX).toBe("profileScoped");
+
+      const noProfile = classifier.classify({
+        elementType: "startEvent",
+        eventDefinition: "timer",
+        policyTier: 1,
+      });
+      expect(noProfile.axisX).toBe("engineAgnostic");
+    });
+
+    it("callActivity is unknown (depends on callee)", () => {
+      const result = classifier.classify({ elementType: "callActivity", policyTier: 1 });
+      expect(result.axisY).toBe("unknown");
+      expect(result.axisX).toBe("unknown");
+      expect(result.reasoning).toContain("depends on callee");
+    });
+
+    it("subProcess is unknown (composition of children)", () => {
+      const result = classifier.classify({ elementType: "subProcess", policyTier: 1 });
+      expect(result.axisY).toBe("unknown");
+      expect(result.axisX).toBe("unknown");
+    });
+
+    it("plain start/end events are inert deterministic pass-throughs", () => {
+      expect(classifier.classify({ elementType: "startEvent", policyTier: 1 }).axisY).toBe(
+        "deterministic",
+      );
+      expect(classifier.classify({ elementType: "endEvent", policyTier: 1 }).axisY).toBe(
+        "deterministic",
+      );
+    });
+  });
 });

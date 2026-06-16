@@ -148,6 +148,10 @@ export class ServiceTaskClassifier implements SemanticPass {
         confidence: classification.type === "unknown" ? 0.5 : 0.9,
         policyClause: "service-task-determinism",
         ruleId: "SERVICE_TASK_DETERMINISM",
+        rationale:
+          classification.type === "unknown"
+            ? "Service task implementation is unrecognised; determinism cannot be established"
+            : `Service task delegates to an external implementation (${classification.type}); side-effect not a function of declared inputs`,
       });
 
       // Emit warning if implementation type unknown and policy tier >= 2

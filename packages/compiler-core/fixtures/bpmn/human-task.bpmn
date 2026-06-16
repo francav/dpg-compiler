@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+    targetNamespace="https://example.com/bpmn">
+    <process id="Process_Human" name="Human Task Process">
+        <startEvent id="StartEvent_human">
+            <outgoing>Flow_h1</outgoing>
+        </startEvent>
+        <userTask id="UserTask_FreeForm" name="Review Application">
+            <incoming>Flow_h1</incoming>
+            <outgoing>Flow_h2</outgoing>
+        </userTask>
+        <userTask id="UserTask_Constrained" name="Approve or Reject"
+            camunda:formKey="embedded:app:forms/decision.html">
+            <incoming>Flow_h2</incoming>
+            <outgoing>Flow_h3</outgoing>
+        </userTask>
+        <manualTask id="ManualTask_File" name="File Paper Copy">
+            <incoming>Flow_h3</incoming>
+            <outgoing>Flow_h4</outgoing>
+        </manualTask>
+        <endEvent id="EndEvent_human">
+            <incoming>Flow_h4</incoming>
+        </endEvent>
+        <sequenceFlow id="Flow_h1" sourceRef="StartEvent_human" targetRef="UserTask_FreeForm" />
+        <sequenceFlow id="Flow_h2" sourceRef="UserTask_FreeForm" targetRef="UserTask_Constrained" />
+        <sequenceFlow id="Flow_h3" sourceRef="UserTask_Constrained" targetRef="ManualTask_File" />
+        <sequenceFlow id="Flow_h4" sourceRef="ManualTask_File" targetRef="EndEvent_human" />
+    </process>
+</definitions>

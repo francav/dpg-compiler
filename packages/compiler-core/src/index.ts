@@ -15,6 +15,7 @@ import { GatewayConditionAnalyzer } from "./passes/GatewayConditionAnalyzer.js";
 import { ScriptDeterminismClassifier } from "./passes/ScriptDeterminismClassifier.js";
 import { DmnGapAnalyzer } from "./passes/DmnGapAnalyzer.js";
 import { ServiceTaskClassifier } from "./passes/ServiceTaskClassifier.js";
+import { FlowElementClassifier } from "./passes/FlowElementClassifier.js";
 import { ContractCoverageAnalyzer } from "./passes/ContractCoverageAnalyzer.js";
 import { AggregationEngine } from "./passes/AggregationEngine.js";
 // Sprint 3 passes
@@ -69,6 +70,7 @@ export async function compileModel(options: CompileOptions): Promise<CompilerRes
   registry.register(new GatewayConditionAnalyzer());
   registry.register(new ScriptDeterminismClassifier());
   registry.register(new ServiceTaskClassifier());
+  registry.register(new FlowElementClassifier());
   registry.register(new ContractCoverageAnalyzer());
   registry.register(new DmnGapAnalyzer());
   registry.register(new AggregationEngine());

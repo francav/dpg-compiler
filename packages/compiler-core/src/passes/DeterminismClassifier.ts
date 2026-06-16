@@ -14,6 +14,8 @@ export interface ClassificationContext {
   readonly profileId?: string; // Runtime profile ID
   readonly policyTier: number; // Policy governance tier (1, 2, 3)
   readonly scriptFormat?: string; // Script language (e.g., 'groovy', 'javascript', 'python')
+  readonly formConstrained?: boolean; // User task output bound to a closed-value form / ack-route only
+  readonly eventDefinition?: string; // Event-definition kind (timer, message, signal, error, ...)
 }
 
 /**
@@ -174,12 +176,147 @@ export class DeterminismClassifier {
       };
     }
 
+    // First-principles classification for the remaining execution-bearing flow
+    // elements (owned by FlowElementClassifier). Classified by the SOURCE of
+    // non-determinism, never silently dropped.
+    const flowVerdict = this.classifyFlowElementAxisY(context);
+    if (flowVerdict) {
+      return flowVerdict;
+    }
+
     // Default: policy-dependent
     return {
       classification: "policyDependent",
       confidence: 0.5,
       reasoning: "Unknown evaluation type, policy-driven",
     };
+  }
+
+  /**
+   * First-principles Axis Y for execution-bearing flow elements not owned by the
+   * serviceTask/scriptTask/businessRuleTask/gateway passes. Returns `undefined`
+   * when the type is not one this method speaks to (caller falls through).
+   *
+   * Classification is by the source of non-determinism:
+   * - human input → uncontrolled input → nonDeterministic (constrained → policyDependent)
+   * - external message → uncontrolled input → nonDeterministic
+   * - send/emit → deterministic emission (side-effect externally coupled, handled on Axis X)
+   * - timer → time-dependent → runtimeBound
+   * - callActivity / subProcess → composition not resolvable here → unknown
+   * - inert pass-through events/tasks → deterministic
+   * - otherwise execution-bearing but unrecognised → unknown (explicit, never dropped)
+   */
+  private classifyFlowElementAxisY(context: ClassificationContext):
+    | {
+        classification: DeterminismEntry["axisY"];
+        confidence: number;
+        reasoning: string;
+      }
+    | undefined {
+    const type = context.elementType;
+    const eventDef = context.eventDefinition;
+
+    // Human-driven tasks: human input is an uncontrolled input.
+    if (type === "userTask" || type === "humanTask") {
+      if (context.formConstrained) {
+        return {
+          classification: "policyDependent",
+          confidence: 0.65,
+          reasoning:
+            "Human input constrained to a closed value set / acknowledgement; determinism depends on policy",
+        };
+      }
+      return {
+        classification: "nonDeterministic",
+        confidence: 0.8,
+        reasoning: "Human input is an uncontrolled input; output not a function of declared inputs",
+      };
+    }
+    if (type === "manualTask") {
+      return {
+        classification: "nonDeterministic",
+        confidence: 0.8,
+        reasoning:
+          "Manual (human) step with no captured output contract; human input is uncontrolled",
+      };
+    }
+
+    // Inbound external messages: message content is an uncontrolled input.
+    if (type === "receiveTask" || (this.isEvent(type) && eventDef === "message")) {
+      return {
+        classification: "nonDeterministic",
+        confidence: 0.8,
+        reasoning: "External message content is an uncontrolled input",
+      };
+    }
+
+    // Outbound emissions: deterministic act; the side-effect coupling is an Axis-X concern.
+    if (type === "sendTask") {
+      return {
+        classification: "deterministic",
+        confidence: 0.7,
+        reasoning: "Deterministic emission; side-effect is externally coupled",
+      };
+    }
+
+    // Timer events: behaviour is bound to the runtime clock.
+    if (this.isEvent(type) && eventDef === "timer") {
+      return {
+        classification: "runtimeBound",
+        confidence: 0.85,
+        reasoning: "Behavior is time-dependent (runtime clock)",
+      };
+    }
+
+    // Composition we cannot resolve in a single-file compile unit.
+    if (type === "callActivity") {
+      return {
+        classification: "unknown",
+        confidence: 0.5,
+        reasoning:
+          "Determinism composes from the called process; callee not resolvable here — depends on callee",
+      };
+    }
+    if (type === "subProcess" || type === "adHocSubProcess" || type === "transaction") {
+      return {
+        classification: "unknown",
+        confidence: 0.5,
+        reasoning: "Composition of child elements; child determinism not separately resolved",
+      };
+    }
+
+    // Inert, execution-bearing pass-through nodes: no uncontrolled input source.
+    // Plain events (no/none/link event definition) and the abstract task fall here.
+    if (
+      type === "task" ||
+      (this.isEvent(type) &&
+        (eventDef === undefined || eventDef === "link" || eventDef === "terminate"))
+    ) {
+      return {
+        classification: "deterministic",
+        confidence: 0.7,
+        reasoning: "No uncontrolled input source; pass-through",
+      };
+    }
+
+    // Events with other definitions (signal/error/escalation/conditional/...) are
+    // externally triggered → treat their content as an uncontrolled input.
+    if (this.isEvent(type)) {
+      return {
+        classification: "nonDeterministic",
+        confidence: 0.6,
+        reasoning: `Externally-triggered event (${eventDef ?? "unspecified"}); trigger is an uncontrolled input`,
+      };
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Whether a flow type is a BPMN event (start/end/intermediate/boundary).
+   */
+  private isEvent(type: string): boolean {
+    return type.endsWith("Event");
   }
 
   /**
@@ -218,6 +355,42 @@ export class DeterminismClassifier {
     // Script engines are runtime-bound
     if (context.scriptFormat) {
       return "engineSpecific";
+    }
+
+    // First-principles Axis X for execution-bearing flow elements.
+    const type = context.elementType;
+    const eventDef = context.eventDefinition;
+
+    // Composition we cannot resolve → coupling is unknown.
+    if (type === "callActivity" || type === "subProcess" || type === "adHocSubProcess") {
+      return "unknown";
+    }
+
+    // Messaging in/out and message events delegate behaviour to external systems.
+    if (
+      type === "receiveTask" ||
+      type === "sendTask" ||
+      (this.isEvent(type) && eventDef === "message")
+    ) {
+      return "externalized";
+    }
+
+    // Timer events: clock semantics are profile-declared when a profile is present.
+    if (this.isEvent(type) && eventDef === "timer") {
+      return context.profileId ? "profileScoped" : "engineAgnostic";
+    }
+
+    // Form/connector-backed user tasks are profile-scoped; bare ones self-contained.
+    if ((type === "userTask" || type === "humanTask") && context.formConstrained) {
+      return "profileScoped";
+    }
+    if (type === "userTask" || type === "humanTask" || type === "manualTask") {
+      return "engineAgnostic";
+    }
+
+    // Inert pass-through events / abstract task: self-contained.
+    if (type === "task" || this.isEvent(type)) {
+      return "engineAgnostic";
     }
 
     // No profile provided
@@ -299,6 +472,23 @@ export class DeterminismClassifier {
     }
     if (context.elementType.includes("Gateway")) {
       return "determinism.gatewayConditions";
+    }
+    const type = context.elementType;
+    if (type === "userTask" || type === "humanTask" || type === "manualTask") {
+      return "determinism.humanInput";
+    }
+    if (
+      type === "receiveTask" ||
+      type === "sendTask" ||
+      (this.isEvent(type) && context.eventDefinition === "message")
+    ) {
+      return "determinism.externalMessaging";
+    }
+    if (this.isEvent(type) && context.eventDefinition === "timer") {
+      return "determinism.timerEvents";
+    }
+    if (type === "callActivity" || type === "subProcess" || type === "adHocSubProcess") {
+      return "determinism.composition";
     }
     return "determinism.default";
   }

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    targetNamespace="https://example.com/bpmn">
+    <process id="Process_Timer" name="Timer Process">
+        <startEvent id="StartEvent_timer" name="Every Morning">
+            <outgoing>Flow_t1</outgoing>
+            <timerEventDefinition id="TimerDef_1" />
+        </startEvent>
+        <task id="Task_Prepare" name="Prepare Report">
+            <incoming>Flow_t1</incoming>
+            <outgoing>Flow_t2</outgoing>
+        </task>
+        <intermediateCatchEvent id="CatchEvent_Wait" name="Wait 1 Hour">
+            <incoming>Flow_t2</incoming>
+            <outgoing>Flow_t3</outgoing>
+            <timerEventDefinition id="TimerDef_2" />
+        </intermediateCatchEvent>
+        <endEvent id="EndEvent_timer">
+            <incoming>Flow_t3</incoming>
+        </endEvent>
+        <sequenceFlow id="Flow_t1" sourceRef="StartEvent_timer" targetRef="Task_Prepare" />
+        <sequenceFlow id="Flow_t2" sourceRef="Task_Prepare" targetRef="CatchEvent_Wait" />
+        <sequenceFlow id="Flow_t3" sourceRef="CatchEvent_Wait" targetRef="EndEvent_timer" />
+    </process>
+</definitions>

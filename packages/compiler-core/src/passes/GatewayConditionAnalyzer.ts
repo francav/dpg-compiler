@@ -64,6 +64,7 @@ export class GatewayConditionAnalyzer implements SemanticPass {
             ? "gatewayConditions"
             : undefined,
           ruleId: this.id,
+          rationale: classification.reasoning,
         });
 
         // Emit finding if policy restricts this pattern

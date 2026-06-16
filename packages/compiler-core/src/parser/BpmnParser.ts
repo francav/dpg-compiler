@@ -126,6 +126,11 @@ export class BpmnParser {
           this.extractScriptContent(script as XmlNode, element, attributes);
         }
 
+        // Extract event-definition kind (timer/message/signal/error/...) for events.
+        // Determinism of intermediate/boundary/start/end events depends on which
+        // event definition child they carry, so record the kind for the classifier.
+        this.extractEventDefinition(element, attributes);
+
         nodes.push({
           id,
           type: key.replace("bpmn:", ""),
@@ -189,6 +194,26 @@ export class BpmnParser {
   }
 
   /**
+   * Record the BPMN event-definition kind carried by an event element.
+   *
+   * BPMN events distinguish their semantics through a child element such as
+   * `<bpmn:timerEventDefinition>` or `<bpmn:messageEventDefinition>`. The parser
+   * keeps namespace prefixes, so we scan the element's keys for any `*EventDefinition`
+   * child and store its bare kind (e.g. `timer`, `message`, `signal`, `error`) under
+   * the `eventDefinition` attribute. Absent → no annotation (plain/none event).
+   */
+  private extractEventDefinition(element: XmlNode, attributes: Record<string, string>): void {
+    for (const key of Object.keys(element)) {
+      const bare = key.replace("bpmn:", "");
+      if (bare.endsWith("EventDefinition")) {
+        // "timerEventDefinition" -> "timer", "messageEventDefinition" -> "message"
+        attributes["eventDefinition"] = bare.slice(0, -"EventDefinition".length);
+        return;
+      }
+    }
+  }
+
+  /**
    * Extract attributes from BPMN extension elements (Camunda 8 zeebe:* namespace)
    */
   private extractExtensionAttributes(
@@ -202,6 +227,15 @@ export class BpmnParser {
         if (taskDef && taskDef["@_type"]) {
           // Store as zeebe:taskDefinition (classification key)
           attributes["zeebe:taskDefinition"] = String(taskDef["@_type"]);
+        }
+      }
+      // Handle zeebe:formDefinition (Camunda 8 user-task form binding). Its presence
+      // signals the task captures a structured, form-scoped output.
+      if (key === "zeebe:formDefinition" || key === "formDefinition") {
+        const formDef = (Array.isArray(value) ? value[0] : value) as XmlNode | undefined;
+        const formId = formDef?.["@_formId"] ?? formDef?.["@_formKey"];
+        if (formId) {
+          attributes["zeebe:formDefinition"] = String(formId);
         }
       }
       // Handle zeebe:ioMapping (future extension)

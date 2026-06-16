@@ -43,19 +43,22 @@ describe("fixture parity", () => {
     expect(result.summary.determinismCompliance).toBe(true);
     expect(result.summary.governanceTier).toBe("tier-1");
 
+    // Since WU-F.2, every execution-bearing element is classified: the lone
+    // serviceTask (unknown) plus the start and end events (deterministic,
+    // engine-agnostic pass-through) → 3 evaluation points.
     expect(result.summary.maturitySignal).toEqual<MaturitySignal>({
-      deterministicAgnostic: 0,
+      deterministicAgnostic: 67,
       deterministicBound: 0,
       policyDependentAgnostic: 0,
       policyDependentBound: 0,
       nonDeterministicAgnostic: 0,
       nonDeterministicBound: 0,
-      totalEvaluationPoints: 1,
-      deterministicTotal: 0,
-      portableTotal: 0,
+      totalEvaluationPoints: 3,
+      deterministicTotal: 67,
+      portableTotal: 67,
     });
 
-    expect(axisYDistribution(result.determinismMap)).toEqual({ unknown: 1 });
+    expect(axisYDistribution(result.determinismMap)).toEqual({ unknown: 1, deterministic: 2 });
   });
 
   it("runtime-bound runtime-bound.bpmn", async () => {
@@ -69,18 +72,23 @@ describe("fixture parity", () => {
     expect(result.summary.semanticErrors).toBe(0);
     expect(result.summary.governanceTier).toBe("tier-1");
 
+    // Since WU-F.2: the businessRuleTask eval point (policyDependent, profile-scoped)
+    // plus the start and end events (deterministic, engine-agnostic) → 3 points.
     expect(result.summary.maturitySignal).toEqual<MaturitySignal>({
-      deterministicAgnostic: 0,
+      deterministicAgnostic: 67,
       deterministicBound: 0,
       policyDependentAgnostic: 0,
-      policyDependentBound: 100,
+      policyDependentBound: 33,
       nonDeterministicAgnostic: 0,
       nonDeterministicBound: 0,
-      totalEvaluationPoints: 1,
+      totalEvaluationPoints: 3,
       deterministicTotal: 100,
-      portableTotal: 0,
+      portableTotal: 67,
     });
 
-    expect(axisYDistribution(result.determinismMap)).toEqual({ policyDependent: 1 });
+    expect(axisYDistribution(result.determinismMap)).toEqual({
+      policyDependent: 1,
+      deterministic: 2,
+    });
   });
 });

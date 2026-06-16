@@ -1,0 +1,35 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Verify tag matches package version
+        run: |
+          tag="${{ github.ref_name }}"
+          version="v$(node -p "require('./packages/compiler-core/package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag $tag does not match package version $version" >&2
+            exit 1
+          fi
+      - run: npm publish --workspace @dpg/compiler-core --access public --provenance
+      - run: npm publish --workspace @dpg/compiler-browser --access public --provenance
+      - run: npm publish --workspace @dpg/compiler-node --access public --provenance

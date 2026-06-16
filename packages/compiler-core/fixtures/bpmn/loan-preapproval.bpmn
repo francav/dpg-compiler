@@ -6,8 +6,8 @@
     xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     id="Definitions_loan_preapproval"
-    targetNamespace="http://dpe.example/loan-preapproval"
-    exporter="DPE Compiler Test Fixture">
+    targetNamespace="http://dpg.example/loan-preapproval"
+    exporter="DPG Compiler Test Fixture">
     <bpmn:process id="loan-preapproval" name="Loan Pre-Approval Process" isExecutable="true">
 
         <!-- Start Event -->

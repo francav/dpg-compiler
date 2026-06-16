@@ -35,10 +35,10 @@ EOF
 
 ### Shortcut Command
 
-After building the package (`npm run build --workspace @lumen/compiler-core`), run:
+After building the package (`npm run build --workspace @dpg/compiler-core`), run:
 
 ```bash
-npm run fixtures --workspace @lumen/compiler-core
+npm run fixtures --workspace @dpg/compiler-core
 ```
 
 The script `scripts/run-fixtures.mjs` loads both fixture pairs and prints summaries plus the Axis Y

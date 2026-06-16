@@ -6,8 +6,8 @@
              xmlns:camunda="http://camunda.org/schema/1.0/dmn"
              id="eligibility-score-definitions"
              name="Loan Eligibility Scoring"
-             namespace="http://dpe.example/eligibility-score"
-             exporter="DPE Compiler Test Fixture">
+             namespace="http://dpg.example/eligibility-score"
+             exporter="DPG Compiler Test Fixture">
   
   <decision id="eligibility-score" name="Calculate Eligibility Score">
     <decisionTable id="DecisionTable_EligibilityScore" hitPolicy="UNIQUE">

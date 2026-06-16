@@ -1,7 +1,17 @@
 {
   "name": "@dpg/compiler-node",
   "version": "0.1.0",
-  "private": true,
+  "description": "DPG compiler node bindings: load and run BPMN/DMN determinism analysis on Node.js",
+  "license": "Apache-2.0",
+  "author": "Victor França",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/francav/dpg-compiler.git",
+    "directory": "packages/compiler-node"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,6 +31,6 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@dpg/compiler-core": "*"
+    "@dpg/compiler-core": "^0.1.0"
   }
 }
